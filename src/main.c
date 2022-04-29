@@ -1,69 +1,116 @@
+// Description----------------------------------------------------------------|
 /*
- * This file is part of the µOS++ distribution.
- *   (https://github.com/micro-os-plus)
- * Copyright (c) 2014 Liviu Ionescu.
- *
- * Permission is hereby granted, free of charge, to any person
- * obtaining a copy of this software and associated documentation
- * files (the "Software"), to deal in the Software without
- * restriction, including without limitation the rights to use,
- * copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom
- * the Software is furnished to do so, subject to the following
- * conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
- * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
- * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
- * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
- * OTHER DEALINGS IN THE SOFTWARE.
+ * Initialises a struct with Name and Age data. Displays results on LEDs and
+ * LCD.
  */
-
-// ----------------------------------------------------------------------------
-
+// DEFINES AND INCLUDES-------------------------------------------------------|
+#include <string.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include "diag/trace.h"
+#include "stm32f0xx.h"
+#define UCT_BOARD
+// GLOBAL VARIABLES ----------------------------------------------------------|
 
-// ----------------------------------------------------------------------------
-//
-// Standalone STM32F0 empty sample (trace via DEBUG).
-//
-// Trace support is enabled by adding the TRACE macro definition.
-// By default the trace messages are forwarded to the DEBUG output,
-// but can be rerouted to any device or completely suppressed, by
-// changing the definitions required in system/src/diag/trace-impl.c
-// (currently OS_USE_TRACE_ITM, OS_USE_TRACE_SEMIHOSTING_DEBUG/_STDOUT).
-//
 
-// ----- main() ---------------------------------------------------------------
+// FUNCTION DECLARATIONS -----------------------------------------------------|
 
-// Sample pragmas to cope with warnings. Please note the related line at
-// the end of this function, used to pop the compiler diagnostics status.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wmissing-declarations"
-#pragma GCC diagnostic ignored "-Wreturn-type"
+void main(void);
+void init_ADC(void);
+void init_timer_2(void);
+void trigger_ADC_conversion(void);
+_Bool ADC_busy(void);
+uint16_t read_ADC_value(void);
 
-int
-main(int argc, char* argv[])
+
+// MAIN FUNCTION -------------------------------------------------------------|
+
+void main(void)
 {
-  // At this stage the system clock should have already been configured
-  // at high speed.
 
-  // Infinite loop
-  while (1)
-    {
-       // Add your code here.
-    }
+	init_timer_2();
+	while(1)
+	{
+
+	}
 }
 
-#pragma GCC diagnostic pop
+// OTHER FUNCTIONS -----------------------------------------------------------|
 
-// ----------------------------------------------------------------------------
+/* Description:
+ * This function initialises the ADC setting to allow 10 bit conversions on PA6
+ * in single conversion, wait mode.
+ */
+void init_ADC(void)
+{
+	//
+	RCC->AHBENR |= RCC_AHBENR_GPIOAEN;
+	//
+	GPIOA->MODER |= GPIO_MODER_MODER6;
+	//
+	RCC->APB2ENR |= RCC_APB2ENR_ADCEN;
+	//
+	ADC1->CR |= ADC_CR_ADEN;
+	//
+	ADC1->CHSELR |= ADC_CHSELR_CHSEL6;
+	// Setup in wait mode
+	ADC1->CFGR1 |= ADC_CFGR1_WAIT;
+	// Setup 10 bit resolution
+	ADC1->CFGR1 |= ADC_CFGR1_RES_0;
+	//
+	while((ADC1->ISR & ADC_ISR_ADRDY) == 0);
+}
+
+/* Description:
+ * This function starts the conversion sequence of the ADC
+ */
+void trigger_ADC_conversion(void)
+{
+	ADC1->CR |= ADC_CR_ADSTART;
+}
+
+/* Description:
+ * This function checks whether the ADC conversion sequence is ongoing.
+ * It returns true if the conversion is ongoing.
+ * It returns false if the conversion is complete and data is ready.
+ */
+_Bool ADC_busy(void)
+{
+	return (ADC1->ISR & ADC_ISR_EOC) == 0) ? true : false; // This line uses the ternery operator
+}
+
+/* Description:
+ * This function reads the numerical result of the ADC conversion.
+ * The programmer should ensure that the conversion is complete before reading the result.
+ */
+uint16_t read_ADC_value(void)
+{
+	return ADC1->DR;
+}
+
+#if 0
+void init_timer_2(void)
+{
+	RCC->AHBENR |= RCC_AHBENR_GPIOBEN //enable GPIOB clock
+	GPIOB->MODER |= GPIO_MODER_MODER10_1; // Setup GPIOB pin 10 as alternate function
+	GPIOB->AFR[1] |= (2 << 2*4); // Select alternate function: TIM2_CH3
+	RCC->APB1ENR |= RCC_APB1ENR_TIM2EN; // Enable Timer 2 clock
+	TIM2->PSC = 2;  (any combo close to 15 kHz)// Set clock source to 15 kHz
+	TIM2->ARR = 1023;  (any combo close to 15 kHz)// Setup ARR to reload after 1023
+	TIM2->CCMR2 |= TIM_CCMR2_OC3M_2 | TIM_CCMR2_OC3M_1 | TIM_CCMR2_OC3PE; // Output, PWM mode 1, enable OC 3 preload
+	TIM2->CCER |= TIM_CCER_CC3E; // Enable output
+	TIM2->CR1 |= TIM_CR1_CEN; // Enable counter for Timer 2
+	TIM2->CCR3 = 1023 / 4;
+
+}
+#endif
+
+void init_timer_6(void)
+{
+
+}
+
+// INTERRUPT HANDLERS --------------------------------------------------------|
+
+void TIM6_IRQHandler(void)
+{
+	TIM6->SR &= ~TIM_SR_UIF;	//acknowledge interrupt
+}
